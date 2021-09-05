@@ -25,6 +25,7 @@ def load(filename):
 
 D_train, L_train = load("Train.txt")
 D_test, L_test = load("Test.txt")
+
 features = {
         0: 'Variance',
         1: 'Skewness',
@@ -34,68 +35,94 @@ features = {
 
 D_train_0 = D_train[:,L_train==0]
 D_train_1 = D_train[:,L_train==1]
+D_test_0 = D_test[:,L_test==0]
+D_test_1 = D_test[:,L_test==1]
 
-for feature in range(4):
-    plt.figure()
-    plt.hist(D_train_0[feature,:], bins = 'auto', density = True, alpha = 0.4)
-    plt.hist(D_train_1[feature,:], bins = 'auto', density = True, alpha = 0.4)
-    plt.show()
+#for feature in range(4):
+ #   plt.figure()
+  #  plt.hist(D_train_0[feature,:], bins = 'auto', ec="black", density = True, alpha = 0.4)
+   # plt.hist(D_train_1[feature,:], bins = 'auto', ec="black", density = True, alpha = 0.4)
+    #plt.show()
     
 """
 GAUSSIANIZATION
-"""
+"""  
+def rank(training_data, dataset):
+    ranks = []
+    for feature in range(4):
+        counts = np.zeros(dataset.shape[1])
+        count = 0
+        for sample in range(dataset.shape[1]):
+            count = np.int64(training_data[feature,:] <= dataset[feature,sample]).sum()
+            counts[sample] = (count+1)/(dataset.shape[1]+2)
+        ranks.append(counts)
+        
+    ranks = np.vstack(ranks)
+    return ranks
 
-ranks = []
-ranks2 = []
-
-for feature in range(4):
-    ranks.append((rankdata(D_train[feature,:], 'ordinal') + 1) / (D_train.shape[1] + 2))
-
-    counts = np.zeros(D_train.shape[1])
-    count = 0
-    for sample in range(D_train.shape[1]):
-        count = np.int64(D_train[feature,:] <= D_train[feature,sample]).sum()
-        counts[sample] = (count+1)/(D_train.shape[1]+2)
-    ranks2.append(counts)
-    print(np.abs(ranks2[feature]-ranks[feature]).mean())
+def gaussianize(ranks):
+    data_Gaussianized = []
     
+    for feature in range(4):
+        data_Gaussianized.append(norm.ppf(ranks[feature]))
+        
+    data_Gaussianized = np.vstack(data_Gaussianized)
     
-ranks = np.vstack(ranks)
-ranks2 = np.vstack(ranks2)
-D_train_Gaussianized = []
+    return data_Gaussianized
 
-for feature in range(4):
-    D_train_Gaussianized.append(norm.ppf(ranks2[feature]))
-    
-D_train_Gaussianized = np.vstack(D_train_Gaussianized)
+ranks = rank(D_train, D_train)
+D_train_Gaussianized = gaussianize(ranks)
 
 D_train_0 = D_train_Gaussianized[:,L_train==0]
 D_train_1 = D_train_Gaussianized[:,L_train==1]
 
-for feature in range(4):
-    plt.figure()
-    plt.title(features[feature])
-    plt.hist(D_train_0[feature,:], bins = 'auto', density = True, alpha = 0.4) 
-    plt.hist(D_train_1[feature,:], bins = 'auto', density = True, alpha = 0.4)
-    plt.show()
-    
-    plt.figure()
-    plt.title(features[feature])
-    plt.hist(D_train_Gaussianized[feature,:], bins = 'auto', density=True, alpha=0.4)
-    plt.show()
+ranks = rank(D_train, D_test)
+D_test_Gaussianized = gaussianize(ranks)
+
+D_test_0 = D_test_Gaussianized[:,L_test==0]
+D_test_1 = D_test_Gaussianized[:,L_test==1]
+
+#for feature in range(4):
+ #   plt.figure()
+  #  plt.title("Training " + features[feature] + " - Gaussianization")
+   # plt.hist(D_train_0[feature,:], bins = 'auto', ec="black", density = True, alpha = 0.4) 
+    #plt.hist(D_train_1[feature,:], bins = 'auto', ec="black", density = True, alpha = 0.4)
+    #plt.show()
+    #plt.figure()
+    #plt.title("Test " + features[feature] + " - Gaussianization")
+    #plt.hist(D_test_0[feature,:], bins = 'auto', ec="black", density = True, alpha = 0.4)
+    #plt.hist(D_test_1[feature,:], bins = 'auto', ec="black", density = True, alpha = 0.4)
+    #plt.show()
     
 """
 CORRELATION ANALYSIS
 """
+correlations = np.corrcoef(D_train_Gaussianized)
+print(correlations)
+plt.figure()
+plt.title("Correlation - dataset")
+plt.imshow(correlations, cmap='gist_yarg', vmin=-1, vmax=1)
+plt.show()
+
 correlations = np.corrcoef(D_train_0)
+print(correlations)
+plt.figure()
+plt.title("Correlation - class 0")
+plt.imshow(correlations, cmap='gist_yarg', vmin=-1, vmax=1)
+plt.show()
+
+correlations = np.corrcoef(D_train_1)
+print(correlations)
+plt.figure()
+plt.title("Correlation - class 1")
 plt.imshow(correlations, cmap='gist_yarg', vmin=-1, vmax=1)
 plt.show()
 
 """
 PCA
 """
-mu = D_train.mean(1) #mean of columns (dataset mean) #1-D vector
-DC = D_train - mu.reshape((mu.size,1)) #center the data (remove the mean mu from all points)
+mu = D_train_Gaussianized.mean(1) #mean of columns (dataset mean) #1-D vector
+DC = D_train_Gaussianized - mu.reshape((mu.size,1)) #center the data (remove the mean mu from all points)
 
 #covariance matrix 
 C = np.dot(DC,DC.T)
